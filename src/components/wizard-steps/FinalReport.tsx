@@ -3,6 +3,12 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Download, RefreshCw, Calendar, User, Package, FlaskConical } from "lucide-react";
 import { AnalysisResult, ProducerData, LoteData, SampleData } from "../SeedVerificationWizard";
+import { useState, useEffect } from "react";
+
+interface OverlayImage {
+  filename: string;
+  image_base64: string;
+}
 
 interface FinalReportProps {
   result: AnalysisResult;
@@ -19,19 +25,73 @@ const FinalReport = ({
   sampleData,
   onNewVerification,
 }: FinalReportProps) => {
+  const [overlayImages, setOverlayImages] = useState<OverlayImage[]>([]);
+  const [loadingImages, setLoadingImages] = useState(false);
+
   const currentDate = new Date().toLocaleDateString("es-ES", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-  const handleDownloadPDF = () => {
-    // Aquí iría la lógica para generar y descargar el PDF
-    alert("Funcionalidad de descarga PDF en desarrollo");
-  };
+  useEffect(() => {
+    const loadOverlayImages = async () => {
+      const analysis_id = localStorage.getItem("latest_analysis_id");
+      if (!analysis_id) return;
+      
+      setLoadingImages(true);
+      try {
+        const base = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${base}/api/get_overlay_images/${analysis_id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setOverlayImages(data.images || []);
+        }
+      } catch (error) {
+        console.error("Error cargando imágenes overlay:", error);
+      } finally {
+        setLoadingImages(false);
+      }
+    };
+    loadOverlayImages();
+  }, []);
+
+  const handleDownloadPDF = async () => {
+  const analysis_id = localStorage.getItem("latest_analysis_id");
+
+  if (!analysis_id) {
+    alert("No existe informe disponible");
+    return;
+  }
+
+  try {
+    const base = import.meta.env.VITE_API_URL;
+    const res = await fetch(`${base}/api/download_report/${analysis_id}`);
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.error || "Error descargando PDF");
+    }
+
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `Reporte_${analysis_id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+  } catch (error) {
+    console.error(error);
+    alert("Error al descargar PDF");
+  }
+};
+
 
   const handleDownloadExcel = () => {
-    // Aquí iría la lógica para generar y descargar el Excel
     alert("Funcionalidad de descarga Excel en desarrollo");
   };
 
@@ -203,17 +263,40 @@ const FinalReport = ({
 
       <Separator />
 
+      {/* Nueva Sección: Imágenes con Máscaras Aplicadas */}
+      <Card className="p-6 bg-gradient-card">
+        <h3 className="text-lg font-semibold mb-4">Imágenes Procesadas con Máscaras Aplicadas</h3>
+        {loadingImages ? (
+          <p>Cargando imágenes...</p>
+        ) : overlayImages.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {overlayImages.map((img, index) => (
+              <div key={index} className="text-center">
+                <img src={img.image_base64} alt={img.filename} className="w-full h-auto rounded-lg" />
+                <p className="text-sm text-muted-foreground mt-2">{img.filename}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No hay imágenes disponibles.</p>
+        )}
+        <p className="text-sm text-muted-foreground mt-4">
+          Verde: Contorno de la semilla<br/>
+          Rojo: Manchas y daños mecánicos<br/>
+          Azul: Impurezas externas
+        </p>
+      </Card>
+
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex gap-2">
           <Button
-            variant="outline"
-            onClick={handleDownloadPDF}
-            className="gap-2"
+            onClick={handleDownloadPDF}  
+            className="bg-green-600 hover:bg-green-700 text-white"
           >
-            <Download className="w-4 h-4" />
-            Descargar PDF
+            Descargar Informe PDF
           </Button>
+
           <Button
             variant="outline"
             onClick={handleDownloadExcel}

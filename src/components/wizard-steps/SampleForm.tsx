@@ -1,150 +1,138 @@
+// src/components/wizard-steps/SampleForm.tsx
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FlaskConical, Calendar, ClipboardList, FileText, ArrowLeft } from "lucide-react";
-import { SampleData } from "../SeedVerificationWizard";
 
 interface SampleFormProps {
-  onSubmit: (data: SampleData) => void;
+  lotId?: string;
+  onSubmit: (data: {
+    sampleId?: string;
+    samplingDate: string;
+    notes: string;
+    lotId?: string;
+  }) => void;
   onBack: () => void;
 }
 
-const samplingMethods = [
-  "Muestreo Aleatorio Simple",
-  "Muestreo Sistemático",
-  "Muestreo Estratificado",
-  "Muestreo por Conglomerados",
-];
-
-const SampleForm = ({ onSubmit, onBack }: SampleFormProps) => {
-  const [formData, setFormData] = useState<SampleData>({
-    sampleId: "",
+const SampleForm = ({ lotId, onSubmit, onBack }: SampleFormProps) => {
+  const [formData, setFormData] = useState({
     samplingDate: "",
-    samplingMethod: "",
-    notes: "",
+    notes: ""
   });
 
-  const [errors, setErrors] = useState<Partial<Record<keyof SampleData, string>>>({});
+  const [errors, setErrors] = useState<{ samplingDate?: string }>({});
+  const [loading, setLoading] = useState(false);
 
   const validate = () => {
-    const newErrors: Partial<Record<keyof SampleData, string>> = {};
-    if (!formData.sampleId.trim()) newErrors.sampleId = "El ID de muestra es requerido";
-    if (!formData.samplingDate) newErrors.samplingDate = "La fecha de muestreo es requerida";
-    if (!formData.samplingMethod) newErrors.samplingMethod = "Debe seleccionar un método de muestreo";
-    
+    const newErrors: typeof errors = {};
+    if (!formData.samplingDate)
+      newErrors.samplingDate = "Fecha de muestreo requerida";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      onSubmit(formData);
+    if (!validate()) return;
+
+    if (!lotId) {
+      alert("El ID del lote no fue encontrado. Debe registrar primero un lote.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const base = import.meta.env.VITE_API_URL;
+
+      const userRaw = localStorage.getItem("user");
+      const user = userRaw ? JSON.parse(userRaw) : null;
+
+      const body = {
+        lot_id: lotId,
+        sample_date: formData.samplingDate,
+        analyst: user?.name ?? "Desconocido",
+        observations: formData.notes
+      };
+
+      const res = await fetch(`${base}/api/samples`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      const text = await res.text();
+      let data = null;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("Error interno del servidor");
+      }
+
+      if (!res.ok) throw new Error(data.error || "Error creando muestra");
+
+      onSubmit({
+        sampleId: data.sample_id,
+        samplingDate: formData.samplingDate,
+        notes: formData.notes,
+        lotId
+      });
+    } catch (err: any) {
+      console.error("sample save error:", err);
+      alert(err.message || "Error creando muestra");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-2xl font-bold text-foreground">Registro de Muestra</h2>
-        <p className="text-muted-foreground">
-          Ingrese los detalles de la muestra extraída del lote
-        </p>
+        <h2 className="text-2xl font-bold">Registro de Muestra</h2>
+        <p className="text-muted-foreground">Vinculada al lote seleccionado</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="sampleId" className="flex items-center gap-2">
-            <FlaskConical className="w-4 h-4" />
-            ID de Muestra
-          </Label>
-          <Input
-            id="sampleId"
-            value={formData.sampleId}
-            onChange={(e) => setFormData({ ...formData, sampleId: e.target.value })}
-            placeholder="Ej: MUE-2024-001"
-            className={errors.sampleId ? "border-destructive" : ""}
-          />
-          {errors.sampleId && (
-            <p className="text-sm text-destructive">{errors.sampleId}</p>
-          )}
+        <div>
+          <Label>ID de Lote</Label>
+          <Input value={lotId ?? "No asignado"} readOnly />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="samplingDate" className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Fecha de Muestreo
-          </Label>
+        <div>
+          <Label>Fecha de Muestreo</Label>
           <Input
-            id="samplingDate"
             type="date"
             value={formData.samplingDate}
-            onChange={(e) => setFormData({ ...formData, samplingDate: e.target.value })}
-            className={errors.samplingDate ? "border-destructive" : ""}
+            onChange={(e) =>
+              setFormData({ ...formData, samplingDate: e.target.value })
+            }
           />
           {errors.samplingDate && (
             <p className="text-sm text-destructive">{errors.samplingDate}</p>
           )}
         </div>
 
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="samplingMethod" className="flex items-center gap-2">
-            <ClipboardList className="w-4 h-4" />
-            Método de Muestreo
-          </Label>
-          <Select
-            value={formData.samplingMethod}
-            onValueChange={(value) => setFormData({ ...formData, samplingMethod: value })}
-          >
-            <SelectTrigger className={errors.samplingMethod ? "border-destructive" : ""}>
-              <SelectValue placeholder="Seleccione el método" />
-            </SelectTrigger>
-            <SelectContent>
-              {samplingMethods.map((method) => (
-                <SelectItem key={method} value={method}>
-                  {method}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.samplingMethod && (
-            <p className="text-sm text-destructive">{errors.samplingMethod}</p>
-          )}
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="notes" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Notas Adicionales
-          </Label>
+        <div className="md:col-span-2">
+          <Label>Observaciones</Label>
           <Textarea
-            id="notes"
             value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            placeholder="Observaciones, condiciones especiales, etc."
+            onChange={(e) =>
+              setFormData({ ...formData, notes: e.target.value })
+            }
             rows={4}
           />
         </div>
       </div>
 
       <div className="flex justify-between pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          className="gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
+        <Button type="button" variant="outline" onClick={onBack}>
           Volver
         </Button>
-        <Button
-          type="submit"
-          className="bg-gradient-primary hover:opacity-90 transition-opacity"
-        >
-          Continuar al Análisis de Imágenes
+        <Button type="submit" className="bg-gradient-primary" disabled={loading}>
+          {loading ? "Guardando muestra..." : "Registrar Muestra y continuar"}
         </Button>
       </div>
     </form>

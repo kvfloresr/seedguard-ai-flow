@@ -17,6 +17,7 @@ export interface ProducerData {
 }
 
 export interface LoteData {
+  variety: string;
   loteNumber: string;
   seedType: string;
   quantity: number;
@@ -31,6 +32,7 @@ export interface SampleData {
 }
 
 export interface AnalysisResult {
+  features: Record<string, any>;
   totalSeeds: number;
   viableSeeds: number;
   damagedSeeds: number;
@@ -40,6 +42,9 @@ export interface AnalysisResult {
     type: string;
     count: number;
   }[];
+  predictedClass: string;   
+  probability: number;     
+  probabilityVector?: number[];
 }
 
 const steps = [
@@ -152,8 +157,42 @@ const SeedVerificationWizard = () => {
         <Card className="bg-gradient-card backdrop-blur-sm border-border/50 shadow-lg">
           <div className="p-6 md:p-8">
             {currentStep === 1 && <ProducerForm onSubmit={handleProducerSubmit} />}
-            {currentStep === 2 && <LoteForm onSubmit={handleLoteSubmit} onBack={() => setCurrentStep(1)} />}
-            {currentStep === 3 && <SampleForm onSubmit={handleSampleSubmit} onBack={() => setCurrentStep(2)} />}
+            {currentStep === 2 && (
+              <LoteForm
+                producerName={producerData?.name ?? ""}
+                onSubmit={(data) => {
+                  // data puede traer data.lotId
+                  setLoteData({
+                    variety: data.variety,
+                    loteNumber: data.loteNumber,
+                    seedType: data.seedType,
+                    quantity: data.quantity,
+                    harvestDate: data.harvestDate,
+                    // opcional: guardar lotId dentro del estado de loteData u otro campo
+                    ...(data as any).lotId ? { lotId: (data as any).lotId } : {}
+                  } as any);
+                  setCurrentStep(3);
+                }}
+                onBack={() => setCurrentStep(1)}
+              />
+            )}
+
+            {currentStep === 3 && (
+              <SampleForm
+                lotId={(loteData as any)?.lotId}
+                onSubmit={(sample) => {
+                  setSampleData({
+                    sampleId: sample.sampleId ?? "",
+                    samplingDate: sample.samplingDate,
+                    samplingMethod: sample.samplingMethod,
+                    notes: sample.notes,
+                  });
+                  setCurrentStep(4);
+                }}
+                onBack={() => setCurrentStep(2)}
+              />
+            )}
+
             {currentStep === 4 && (
               <ImageAnalysis
                 onComplete={handleAnalysisComplete}
