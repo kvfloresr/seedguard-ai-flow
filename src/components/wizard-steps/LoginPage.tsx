@@ -37,20 +37,16 @@ const handleLogin = async (e) => {
     e.preventDefault();
     setStatus("validating");
     setProgress(10);
-
     try {
     const base = import.meta.env.VITE_API_URL;
     setProgress(30);
-
     const resp = await fetch(`${base}/api/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
     });
-
     setProgress(60);
     const data = await resp.json();
-
     if (!resp.ok) {
         setStatus("error");
         toast({
@@ -61,22 +57,17 @@ const handleLogin = async (e) => {
         setProgress(0);
         return;
     }
-
-    // Login correcto -> guardar usuario y navegar a wizard
     localStorage.setItem("user", JSON.stringify(data.user));
+    localStorage.setItem("token", data.token);  
     setProgress(100);
     setStatus("success");
-
     toast({
         title: "Bienvenido",
-        description: `Sesión iniciada como ${data.user.role}`,
+        description: `Sesión iniciada como ${data.user.role_name}`,  
     });
-
-    // Espera pequeña para que el usuario vea el toast/progreso
     setTimeout(() => {
         navigate("/wizard", { replace: true });
     }, 600);
-
     } catch (err) {
     console.error(err);
     setStatus("error");
@@ -89,9 +80,7 @@ const handleLogin = async (e) => {
     }
 };
 
-// ------------------------------
-// 🌟 Icono según estado
-// ------------------------------
+
 const getStatusSection = () => {
     switch (status) {
     case "validating":
@@ -169,7 +158,6 @@ return (
             </div>
         </div>
 
-        {/* Botón */}
         <Button
             type="submit"
             className="w-full py-3 bg-gradient-primary hover:opacity-90 transition-opacity"
@@ -185,7 +173,6 @@ return (
             )}
         </Button>
 
-        {/* Estado visual */}
         {getStatusSection()}
         </form>
 

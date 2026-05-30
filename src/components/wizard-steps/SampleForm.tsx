@@ -14,9 +14,10 @@ interface SampleFormProps {
     lotId?: string;
   }) => void;
   onBack: () => void;
+  sessionId: string | null;
 }
 
-const SampleForm = ({ lotId, onSubmit, onBack }: SampleFormProps) => {
+const SampleForm = ({ lotId, onSubmit, onBack, sessionId }: SampleFormProps) => {
   const [formData, setFormData] = useState({
     samplingDate: "",
     notes: ""
@@ -34,59 +35,43 @@ const SampleForm = ({ lotId, onSubmit, onBack }: SampleFormProps) => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    if (!lotId) {
-      alert("El ID del lote no fue encontrado. Debe registrar primero un lote.");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const base = import.meta.env.VITE_API_URL;
-
-      const userRaw = localStorage.getItem("user");
-      const user = userRaw ? JSON.parse(userRaw) : null;
-
-      const body = {
-        lot_id: lotId,
-        sample_date: formData.samplingDate,
-        analyst: user?.name ?? "Desconocido",
-        observations: formData.notes
-      };
-
-      const res = await fetch(`${base}/api/samples`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      const text = await res.text();
-      let data = null;
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("Error interno del servidor");
+      e.preventDefault();
+      if (!validate()) return;
+      if (!lotId) {
+        alert("El ID del lote no fue encontrado.");
+        return;
       }
-
-      if (!res.ok) throw new Error(data.error || "Error creando muestra");
-
-      onSubmit({
-        sampleId: data.sample_id,
-        samplingDate: formData.samplingDate,
-        notes: formData.notes,
-        lotId
-      });
-    } catch (err: any) {
-      console.error("sample save error:", err);
-      alert(err.message || "Error creando muestra");
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        const base = import.meta.env.VITE_API_URL;
+        const userRaw = localStorage.getItem("user");
+        const user = userRaw ? JSON.parse(userRaw) : null;
+        const body = {
+          lot_id: lotId,
+          sample_date: formData.samplingDate,
+          analyst: user?.name ?? "Desconocido",
+          observations: formData.notes,
+          session_id: sessionId,  
+        };
+        const res = await fetch(`${base}/api/save_sample`, {  
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          onSubmit({
+            sampleId: data.sample_id,
+            samplingDate: formData.samplingDate,
+            notes: formData.notes,
+            lotId,
+          });
+        } else {
+          alert(data.error || "Error guardando muestra");
+        }
+      } catch (err) {
+        alert("Error guardando muestra");
+      }
+    };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -96,10 +81,7 @@ const SampleForm = ({ lotId, onSubmit, onBack }: SampleFormProps) => {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div>
-          <Label>ID de Lote</Label>
-          <Input value={lotId ?? "No asignado"} readOnly />
-        </div>
+
 
         <div>
           <Label>Fecha de Muestreo</Label>

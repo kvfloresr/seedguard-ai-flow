@@ -115,7 +115,7 @@ const FinalReport = ({
 
       <Separator />
 
-      {/* Producer Information */}
+      {/* Información del productor */}
       <Card className="p-6 bg-gradient-card">
         <div className="flex items-center gap-2 mb-4">
           <User className="w-5 h-5 text-primary" />
@@ -127,8 +127,8 @@ const FinalReport = ({
             <p className="font-medium">{producerData.name}</p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Email</p>
-            <p className="font-medium">{producerData.email}</p>
+            <p className="text-sm text-muted-foreground">Código de Productor</p>
+            <p className="font-medium">{producerData.cod_producer}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Teléfono</p>
@@ -149,16 +149,8 @@ const FinalReport = ({
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <p className="text-sm text-muted-foreground">Número de Lote</p>
-            <p className="font-medium">{loteData.loteNumber}</p>
-          </div>
-          <div>
             <p className="text-sm text-muted-foreground">Tipo de Semilla</p>
             <p className="font-medium">{loteData.seedType}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Cantidad</p>
-            <p className="font-medium">{loteData.quantity} kg</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Fecha de Cosecha</p>
@@ -177,18 +169,10 @@ const FinalReport = ({
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <p className="text-sm text-muted-foreground">ID de Muestra</p>
-            <p className="font-medium">{sampleData.sampleId}</p>
-          </div>
-          <div>
             <p className="text-sm text-muted-foreground">Fecha de Muestreo</p>
             <p className="font-medium">
               {new Date(sampleData.samplingDate).toLocaleDateString("es-ES")}
             </p>
-          </div>
-          <div className="md:col-span-2">
-            <p className="text-sm text-muted-foreground">Método de Muestreo</p>
-            <p className="font-medium">{sampleData.samplingMethod}</p>
           </div>
           {sampleData.notes && (
             <div className="md:col-span-2">
@@ -199,48 +183,7 @@ const FinalReport = ({
         </div>
       </Card>
 
-      {/* Analysis Results Summary */}
-      <Card className="p-6 bg-gradient-card">
-        <h3 className="text-lg font-semibold mb-4">Resumen de Resultados</h3>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div className="text-center p-4 bg-background/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">Total Semillas</p>
-            <p className="text-3xl font-bold text-primary">{result.totalSeeds}</p>
-          </div>
-          <div className="text-center p-4 bg-background/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">Viables</p>
-            <p className="text-3xl font-bold text-success">{result.viableSeeds}</p>
-          </div>
-          <div className="text-center p-4 bg-background/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">Dañadas</p>
-            <p className="text-3xl font-bold text-destructive">{result.damagedSeeds}</p>
-          </div>
-          <div className="text-center p-4 bg-background/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">Viabilidad</p>
-            <p className="text-3xl font-bold text-info">
-              {result.viabilityPercentage.toFixed(1)}%
-            </p>
-          </div>
-        </div>
-      </Card>
 
-      {/* Defects Detail */}
-      <Card className="p-6 bg-gradient-card">
-        <h3 className="text-lg font-semibold mb-4">Detalle de Defectos Detectados</h3>
-        <div className="space-y-2">
-          {result.defects.map((defect, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-3 bg-background/50 rounded-lg"
-            >
-              <span className="font-medium">{defect.type}</span>
-              <span className="text-muted-foreground">
-                {defect.count} semillas ({((defect.count / result.totalSeeds) * 100).toFixed(2)}%)
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
 
       {/* Quality Assessment */}
       <Card className="p-6 bg-gradient-card">
@@ -254,8 +197,8 @@ const FinalReport = ({
           </div>
           <p className="text-sm text-muted-foreground">
             {result.qualityScore >= 90 && "Excelente: El lote cumple con los más altos estándares de calidad."}
-            {result.qualityScore >= 75 && result.qualityScore < 90 && "Buena: El lote presenta una calidad aceptable para comercialización."}
-            {result.qualityScore >= 60 && result.qualityScore < 75 && "Aceptable: El lote puede ser comercializado con ciertas restricciones."}
+            {result.qualityScore >= 75 && result.qualityScore < 90 && "Buena: Presenta una calidad aceptable para comercialización."}
+            {result.qualityScore >= 60 && result.qualityScore < 75 && "Aceptable: Puede ser comercializado con ciertas restricciones."}
             {result.qualityScore < 60 && "Deficiente: Se recomienda no comercializar este lote sin tratamiento previo."}
           </p>
         </div>
@@ -297,14 +240,7 @@ const FinalReport = ({
             Descargar Informe PDF
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={handleDownloadExcel}
-            className="gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Descargar Excel
-          </Button>
+          
         </div>
         <Button
           onClick={onNewVerification}

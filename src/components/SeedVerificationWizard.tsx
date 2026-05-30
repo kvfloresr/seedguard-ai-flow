@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Check, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Check, Loader2, Home, Package, FlaskConical, Users, LogOut } from "lucide-react";
 import ProducerForm from "./wizard-steps/ProducerForm";
 import LoteForm from "./wizard-steps/LoteForm";
 import SampleForm from "./wizard-steps/SampleForm";
 import ImageAnalysis from "./wizard-steps/ImageAnalysis";
 import Results from "./wizard-steps/Results";
 import FinalReport from "./wizard-steps/FinalReport";
+import Dashboard from "./Dashboard";
+import { Heart, Activity } from "lucide-react";
 
 export interface ProducerData {
   name: string;
-  email: string;
+  cod_producer: string;
   phone: string;
   address: string;
 }
@@ -56,14 +59,61 @@ const steps = [
   { id: 6, name: "Informe", description: "Informe final" },
 ];
 
+
 const SeedVerificationWizard = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [producerData, setProducerData] = useState<ProducerData | null>(null);
   const [loteData, setLoteData] = useState<LoteData | null>(null);
   const [sampleData, setSampleData] = useState<SampleData | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const progress = (currentStep / steps.length) * 100;
+
+  const userRaw = localStorage.getItem("user");
+  const user = userRaw ? JSON.parse(userRaw) : null;
+  const isAdmin = user?.role_name === "Administrador";
+  const isSupervisor = user?.role_name === "Supervisor"; 
+
+  useEffect(() => {
+    const startSession = async () => {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/start_wizard`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessionId(data.session_id);
+      } else {
+        console.error("Error iniciando sesión wizard");
+      }
+    };
+    startSession();
+  }, []);
+
+  const handleRollback = async () => {
+    if (!sessionId) return;
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/rollback_wizard`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    if (res.ok) {
+      setCurrentStep(1);
+      setProducerData(null);
+      setLoteData(null);
+      setSampleData(null);
+      setAnalysisResult(null);
+    }
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    window.location.href = "/login";
+  };
 
   const handleProducerSubmit = (data: ProducerData) => {
     setProducerData(data);
@@ -97,8 +147,48 @@ const SeedVerificationWizard = () => {
     setAnalysisResult(null);
   };
 
+  if (showDashboard) {
+    return (
+      <Dashboard
+        name={user?.name || "Usuario"} 
+        role_name={user?.role_name || "Usuario"} 
+        reports={[]} 
+        onBackToWizard={() => setShowDashboard(false)}
+      />
+    );
+  }
+
+  
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
+      {/* Navbar */}
+      <nav className="bg-green-600 text-white shadow-sm">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <a className="text-xl font-bold">SeedDSS</a>
+          <button className="md:hidden" aria-label="Toggle navigation">
+            {/* Toggle para mobile, puedes agregar lógica */}
+            <span>☰</span>
+          </button>
+          <div className="hidden md:flex items-center space-x-4">
+            {user && (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setShowDashboard(true)} className="text-white hover:bg-green-700">
+                  <Home className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+                
+                <span>{user.name}</span>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Cerrar sesión
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </nav>
+
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -153,10 +243,47 @@ const SeedVerificationWizard = () => {
           </div>
         </div>
 
+        <div className="mb-8">
+        
+        
+        {/* Indicador de Red Neuronal Activada - Solo en paso 4 y cuando está analizando */}
+        {currentStep === 4 && isAnalyzing && (
+          <div className="mt-6 flex flex-col items-center justify-center p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200 shadow-inner">
+            <div className="flex items-center gap-4 mb-4">
+              {/* Corazón palpitando */}
+              <Heart className="w-12 h-12 text-red-500 animate-pulse" />
+              {/* Líneas de latidos (ECG simple) */}
+              <div className="flex items-center gap-1">
+                <Activity className="w-6 h-6 text-blue-500" />
+                <div className="flex gap-1">
+                  <div className="w-2 h-8 bg-green-500 rounded animate-bounce" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-1 h-6 bg-green-500 rounded animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-10 bg-green-500 rounded animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-1 h-4 bg-green-500 rounded animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                  <div className="w-2 h-8 bg-green-500 rounded animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            </div>
+          <p className="text-lg font-semibold text-blue-700 animate-pulse">
+            Red Neuronal Activada - Analizando Imágenes...
+          </p>
+          <p className="text-sm text-blue-600 mt-2">
+            Procesando datos con algoritmos de IA avanzados
+          </p>
+          {/* Opcional: Spinner adicional */}
+          <div className="mt-4 flex gap-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-ping" style={{ animationDelay: '0s' }}></div>
+            <div className="w-3 h-3 bg-purple-500 rounded-full animate-ping" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-3 h-3 bg-green-500 rounded-full animate-ping" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+        </div>
+      )}
+    </div>
+
         {/* Step Content */}
         <Card className="bg-gradient-card backdrop-blur-sm border-border/50 shadow-lg">
           <div className="p-6 md:p-8">
-            {currentStep === 1 && <ProducerForm onSubmit={handleProducerSubmit} />}
+            {currentStep === 1 && <ProducerForm onSubmit={handleProducerSubmit} sessionId={sessionId} />}
             {currentStep === 2 && (
               <LoteForm
                 producerName={producerData?.name ?? ""}
@@ -174,6 +301,7 @@ const SeedVerificationWizard = () => {
                   setCurrentStep(3);
                 }}
                 onBack={() => setCurrentStep(1)}
+                sessionId={sessionId}
               />
             )}
 
@@ -184,24 +312,28 @@ const SeedVerificationWizard = () => {
                   setSampleData({
                     sampleId: sample.sampleId ?? "",
                     samplingDate: sample.samplingDate,
-                    samplingMethod: sample.samplingMethod,
+                    samplingMethod: (sample as any).samplingMethod ?? "",
                     notes: sample.notes,
                   });
                   setCurrentStep(4);
                 }}
                 onBack={() => setCurrentStep(2)}
+                sessionId={sessionId}
               />
             )}
 
             {currentStep === 4 && (
               <ImageAnalysis
                 onComplete={handleAnalysisComplete}
-                onBack={() => setCurrentStep(3)}
+                onBack={() => { handleRollback(); setCurrentStep(3); }}  // Rollback al volver
                 producerData={producerData!}
                 loteData={loteData!}
                 sampleData={sampleData!}
+                setIsAnalyzing={setIsAnalyzing}
+                sessionId={sessionId}  
               />
             )}
+
             {currentStep === 5 && analysisResult && (
               <Results result={analysisResult} onNext={handleViewResults} />
             )}

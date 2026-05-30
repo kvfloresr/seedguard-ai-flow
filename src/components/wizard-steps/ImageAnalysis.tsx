@@ -23,6 +23,8 @@ interface ImageAnalysisProps {
   producerData: ProducerData;
   loteData: LoteData;
   sampleData: SampleData;
+  setIsAnalyzing: (analyzing: boolean) => void;
+  sessionId: string | null; 
 }
 
 interface UploadedImage {
@@ -38,13 +40,14 @@ const ImageAnalysis = ({
   producerData,
   loteData,
   sampleData,
+  setIsAnalyzing,
+  sessionId,
 }: ImageAnalysisProps) => {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [globalProgress, setGlobalProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Seleccionar archivos
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const newImages = files.map((file) => ({
@@ -56,7 +59,6 @@ const ImageAnalysis = ({
     setImages([...images, ...newImages]);
   };
 
-  // Eliminar imagen
   const removeImage = (index: number) => {
     const newImages = [...images];
     URL.revokeObjectURL(newImages[index].preview);
@@ -64,10 +66,10 @@ const ImageAnalysis = ({
     setImages(newImages);
   };
 
-  // Ejecutar análisis IA
   const Analysis = async () => {
     if (images.length === 0) {
       alert("No se cargaron imágenes");
+      setIsAnalyzing(true); 
       return;
     }
 
@@ -102,6 +104,24 @@ const ImageAnalysis = ({
 
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Error en análisis IA");
+
+      const saveReport = async () => {
+        const reportData = {
+          session_id: sessionId,
+          sample_id: sampleData.sampleId,
+          predicted_class: data.predicted_class,
+          probability: data.probability,
+          features: data.features,
+          observations: sampleData.notes,
+        };
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/save_report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+          body: JSON.stringify(reportData),
+        });
+        if (!res.ok) throw new Error("Error guardando reporte");
+      };
+      await saveReport();
 
       setGlobalProgress(90);
       setImages((prev) =>
@@ -156,10 +176,10 @@ const ImageAnalysis = ({
       );
     } finally {
       setIsProcessing(false);
+      setIsAnalyzing(false); 
     }
   };
 
-  // Iconos por estado
   const getStatusIcon = (status: UploadedImage["status"]) => {
     switch (status) {
       case "uploading":
@@ -171,11 +191,10 @@ const ImageAnalysis = ({
       case "error":
         return <AlertCircle className="w-5 h-5 text-destructive" />;
       default:
-        return <ImageIcon className="w-5 h-5 text-muted-foreground" />;
+        return <Loader2 className="w-5 h-5 animate-spin text-info" />;
     }
   };
 
-  // Texto por estado
   const getStatusText = (status: UploadedImage["status"]) => {
     switch (status) {
       case "uploading":
@@ -213,7 +232,7 @@ const ImageAnalysis = ({
           Arrastra imágenes aquí o haz clic para seleccionar
         </p>
         <p className="text-sm text-muted-foreground">
-          Soporta JPG, PNG. Máximo 10 imágenes
+          Soporta JPG, JPEG, PNG, BPM. Máximo recomendado 10 imágenes
         </p>
         <input
           ref={fileInputRef}

@@ -89,6 +89,66 @@ const Results = ({ result, onNext }: ResultsProps) => {
           </p>
         </div>
       </Card>
+      {/* Indicadores Morfológicos INIAF */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-lg font-semibold">Pureza Física</h3>
+          <p className="text-2xl font-bold text-success">
+            {result.features["Pureza física (%)"]?.toFixed(2)}%
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Norma INIAF: ≥ 98%
+          </p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-lg font-semibold">Materia Inerte</h3>
+          <p className="text-2xl font-bold text-warning">
+            {result.features["Materia inerte (%)"]?.toFixed(2)}%
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Norma INIAF: ≤ 2%
+          </p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-lg font-semibold">Daños Mecánicos</h3>
+          <p className="text-2xl font-bold text-destructive">
+            {result.features["Daños mecánicos (%)"]?.toFixed(2)}%
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Norma INIAF: ≤ 1%
+          </p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-lg font-semibold">Homogeneidad de Color</h3>
+          <p className="text-2xl font-bold">{result.features["Homogeneidad de color"]}</p>
+          <p className="text-sm text-muted-foreground">
+            Norma INIAF: Uniforme
+          </p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-lg font-semibold">Forma y Tamaño</h3>
+          <p className="text-sm text-muted-foreground">
+            {result.features["Forma y tamaño"]}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Norma INIAF: Dentro del rango varietal
+          </p>
+        </Card>
+
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-lg font-semibold">Trazabilidad Digital</h3>
+          <p className="text-2xl font-bold text-primary">
+            {result.features["Trazabilidad digital"]}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Norma INIAF: Completa
+          </p>
+        </Card>
+      </div>
 
       {/* Defects Breakdown */}
       <Card className="p-6 bg-gradient-card">
@@ -111,73 +171,14 @@ const Results = ({ result, onNext }: ResultsProps) => {
         </div>
       </Card>
 
-      {/* Indicadores Morfológicos INIAF */}
-<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-  <Card className="p-6 bg-gradient-card">
-    <h3 className="text-lg font-semibold">Pureza Física</h3>
-    <p className="text-2xl font-bold text-success">
-      {result.features["Pureza física (%)"]?.toFixed(2)}%
-    </p>
-    <p className="text-sm text-muted-foreground">
-      Norma INIAF: ≥ 98%
-    </p>
-  </Card>
-
-  <Card className="p-6 bg-gradient-card">
-    <h3 className="text-lg font-semibold">Materia Inerte</h3>
-    <p className="text-2xl font-bold text-warning">
-      {result.features["Materia inerte (%)"]?.toFixed(2)}%
-    </p>
-    <p className="text-sm text-muted-foreground">
-      Norma INIAF: ≤ 2%
-    </p>
-  </Card>
-
-  <Card className="p-6 bg-gradient-card">
-    <h3 className="text-lg font-semibold">Daños Mecánicos</h3>
-    <p className="text-2xl font-bold text-destructive">
-      {result.features["Daños mecánicos (%)"]?.toFixed(2)}%
-    </p>
-    <p className="text-sm text-muted-foreground">
-      Norma INIAF: ≤ 1%
-    </p>
-  </Card>
-
-  <Card className="p-6 bg-gradient-card">
-    <h3 className="text-lg font-semibold">Homogeneidad de Color</h3>
-    <p className="text-2xl font-bold">{result.features["Homogeneidad de color"]}</p>
-    <p className="text-sm text-muted-foreground">
-      Norma INIAF: Uniforme
-    </p>
-  </Card>
-
-  <Card className="p-6 bg-gradient-card">
-    <h3 className="text-lg font-semibold">Forma y Tamaño</h3>
-    <p className="text-sm text-muted-foreground">
-      {result.features["Forma y tamaño"]}
-    </p>
-    <p className="text-sm text-muted-foreground">
-      Norma INIAF: Dentro del rango varietal
-    </p>
-  </Card>
-
-  <Card className="p-6 bg-gradient-card">
-    <h3 className="text-lg font-semibold">Trazabilidad Digital</h3>
-    <p className="text-2xl font-bold text-primary">
-      {result.features["Trazabilidad digital"]}
-    </p>
-    <p className="text-sm text-muted-foreground">
-      Norma INIAF: Completa
-    </p>
-  </Card>
-</div>
+      
 
 <div className="text-center mb-6">
     <h1 className="text-4xl font-bold text-primary mb-2">
       Clase Predicha: {result.predictedClass}
     </h1>
     <p className="text-lg text-muted-foreground">
-      Confianza del Modelo: {result.probability.toFixed(2)}%
+      Confianza del Modelo: {(result.probability*100).toFixed(2)}%
     </p>
     <Progress value={result.probability * 100} className="w-1/2 mx-auto mt-2" />
     {result.probabilityVector && result.probabilityVector.length > 0 && (

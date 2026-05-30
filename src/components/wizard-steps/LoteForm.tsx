@@ -1,4 +1,3 @@
-// src/components/wizard-steps/LoteForm.tsx
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,20 +7,21 @@ import { Package, Leaf, Calendar, ArrowLeft } from "lucide-react";
 import { LoteData } from "../SeedVerificationWizard";
 
 interface LoteFormProps {
-  producerName: string; // viene del paso Productor
+  producerName: string;
   onSubmit: (data: LoteData & { lotId?: string }) => void;
   onBack: () => void;
+  sessionId: string | null;
 }
 
 const soyVarieties = [
-  "INTACTA", "MG/PR", "RR", "OTRA" // ajusta según tus variedades reales
+  "MUNASQA", "PATUJÚ", "SW4864", "NS6483" 
 ];
 
 const categories = [
-  "A", "B", "C" // ejemplo; sustituye por las categorías reales o mantenible desde admin
+  "Básica", "Registrada", "Cetificada" 
 ];
 
-const LoteForm = ({ producerName, onSubmit, onBack }: LoteFormProps) => {
+const LoteForm = ({ producerName, onSubmit, onBack, sessionId}: LoteFormProps) => {
   const [formData, setFormData] = useState({
     producer: producerName || "",
     species: "Soja",
@@ -44,54 +44,40 @@ const LoteForm = ({ producerName, onSubmit, onBack }: LoteFormProps) => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
+      e.preventDefault();
+      if (!validate()) return;
+      try {
+        const base = import.meta.env.VITE_API_URL;
+        const userRaw = localStorage.getItem("user");
+        const user = userRaw ? JSON.parse(userRaw) : null;
+        const body = {
+          ...formData,
+          created_by: user?.user_id || null,
+          session_id: sessionId,  // Agrega
+        };
+        const res = await fetch(`${base}/api/save_lot`, {  // Usa nuevo endpoint
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+          body: JSON.stringify(body),
+        });
 
-    setLoading(true);
-    try {
-      const base = import.meta.env.VITE_API_URL;
-      const userRaw = localStorage.getItem("user");
-      const user = userRaw ? JSON.parse(userRaw) : null;
-
-      const body = {
-        producer: formData.producer,
-        species: formData.species,
-        variety: formData.variety,
-        category: formData.category,
-        reception: formData.reception,
-        created_by: user?.user_id || null
-      };
-
-      const headers: Record<string,string> = { "Content-Type": "application/json" };
-      // si manejas JWT: headers["Authorization"] = `Bearer ${token}`;
-
-      const res = await fetch(`${base}/api/lots`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || data.message || "Error al guardar lote");
-
-      const lotId = data.lot_id ?? data.lotId ?? null;
-
-      // Llamamos al paso siguiente con la info del lote y el lotId si está disponible
-      onSubmit({
-        variety: formData.variety,
-        loteNumber: lotId ?? "", // mantener compatibilidad: si no hay lot_id, dejar vacio
-        seedType: formData.species,
-        quantity: 0, // no lo usamos en SQL, mantener para UI
-        harvestDate: formData.reception,
-        ...(lotId ? { lotId } : {})
-      } as LoteData & { lotId?: string });
-    } catch (err: any) {
-      console.error("Lote save error:", err);
-      alert(err.message || "Error guardando lote");
-    } finally {
-      setLoading(false);
-    }
-  };
+        const data = await res.json();
+        if (res.ok) {
+          onSubmit({
+            variety: formData.variety,
+            loteNumber: data.lot_id ?? "",
+            seedType: formData.species,
+            quantity: 0,
+            harvestDate: formData.reception,
+            lotId: data.lot_id,
+          });
+        } else {
+          alert(data.error || "Error guardando lote");
+        }
+      } catch (err) {
+        alert("Error guardando lote");
+      }
+    };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
