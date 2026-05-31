@@ -38,7 +38,7 @@ onBackToWizard: () => void;
 }
 
 const Dashboard = ({ name, role_name, reports: initialReports, onBackToWizard }: DashboardProps) => {
-const [currentView, setCurrentView] = useState<'dashboard' | 'lotes' | 'muestras' | 'admin' | 'model-evaluation'>('dashboard');
+const [currentView, setCurrentView] = useState<'dashboard' | 'lotes' | 'muestras' | 'admin' | 'model-evaluation' | 'producers'>('dashboard');
 const [allReports, setAllReports] = useState<Report[]>([]);
 const [displayedReports, setDisplayedReports] = useState<Report[]>([]);
 const [showAll, setShowAll] = useState(false);
