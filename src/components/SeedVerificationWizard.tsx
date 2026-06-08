@@ -49,6 +49,20 @@ export interface AnalysisResult {
   probability: number;     
   probabilityVector?: number[];
   overlayImages?: string[];
+  perSeed?: {
+    class: string;
+    label_es?: string;
+    color?: string;
+    confidence: number;
+    panel?: string;
+    metrics?: {
+      area_px: number;
+      diam_eq_px: number;
+      circularidad: number;
+      aspecto: number;
+      solidez: number;
+    } | null;
+  }[];
   classDistribution?: {
     class: string;
     label_es: string;

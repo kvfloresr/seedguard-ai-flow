@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   Upload,
-  Image as ImageIcon,
   X,
   ArrowLeft,
   CheckCircle2,
@@ -35,6 +34,8 @@ interface UploadedImage {
   progress: number;
 }
 
+type SampleMode = "multi" | "single";
+
 const ImageAnalysis = ({
   onComplete,
   onBack,
@@ -48,6 +49,7 @@ const ImageAnalysis = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [globalProgress, setGlobalProgress] = useState(0);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [sampleMode, setSampleMode] = useState<SampleMode>("multi");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const base = import.meta.env.VITE_API_URL;
@@ -70,7 +72,6 @@ const ImageAnalysis = ({
     setImages(newImages);
   };
 
-  // ==== Captura desde la camara del sistema (stream del backend) ====
   const capturePhoto = async () => {
     try {
       const r = await fetch(`${base}/api/camera/snapshot?ts=${Date.now()}`);
@@ -79,17 +80,10 @@ const ImageAnalysis = ({
         return;
       }
       const blob = await r.blob();
-      const file = new File([blob], `captura_${Date.now()}.jpg`, {
-        type: "image/jpeg",
-      });
+      const file = new File([blob], `captura_${Date.now()}.jpg`, { type: "image/jpeg" });
       setImages((prev) => [
         ...prev,
-        {
-          file,
-          preview: URL.createObjectURL(blob),
-          status: "pending",
-          progress: 0,
-        },
+        { file, preview: URL.createObjectURL(blob), status: "pending", progress: 0 },
       ]);
     } catch (err) {
       console.error(err);
@@ -117,57 +111,51 @@ const ImageAnalysis = ({
       form.append("observations", sampleData.notes ?? "");
 
       setGlobalProgress(25);
-      setImages((prev) =>
-        prev.map((img) => ({ ...img, status: "uploading", progress: 25 }))
-      );
+      setImages((prev) => prev.map((img) => ({ ...img, status: "uploading", progress: 25 })));
 
-      const resp = await fetch(`${base}/api/analyze_group`, {
-        method: "POST",
-        body: form,
-      });
+      const resp = await fetch(`${base}/api/analyze_group`, { method: "POST", body: form });
 
       setGlobalProgress(60);
-      setImages((prev) =>
-        prev.map((img) => ({ ...img, status: "analyzing", progress: 60 }))
-      );
+      setImages((prev) => prev.map((img) => ({ ...img, status: "analyzing", progress: 60 })));
 
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Error en analisis IA");
 
-      // ===== Conteo REAL de semillas con OpenCV (/api/count_seeds) =====
-      let n_soy = 0,
-        n_reject = 0,
-        n_total = 0;
+      // ===== Conteo REAL con OpenCV: SOLO en modo "varias" =====
+      let n_soy = 0, n_reject = 0, n_total = 0;
       const overlays: string[] = [];
-      for (const img of images) {
-        const cf = new FormData();
-        cf.append("file", img.file, img.file.name);
-        const cr = await fetch(`${base}/api/count_seeds`, {
-          method: "POST",
-          body: cf,
-        });
-        if (cr.ok) {
-          const cd = await cr.json();
-          n_soy += cd.n_soy ?? 0;
-          n_reject += cd.n_reject ?? 0;
-          n_total += cd.n_total ?? 0;
-          if (cd.overlay_b64) overlays.push(cd.overlay_b64);
+      if (sampleMode === "multi") {
+        for (const img of images) {
+          const cf = new FormData();
+          cf.append("file", img.file, img.file.name);
+          const cr = await fetch(`${base}/api/count_seeds`, { method: "POST", body: cf });
+          if (cr.ok) {
+            const cd = await cr.json();
+            n_soy += cd.n_soy ?? 0;
+            n_reject += cd.n_reject ?? 0;
+            n_total += cd.n_total ?? 0;
+            if (cd.overlay_b64) overlays.push(cd.overlay_b64);
+          }
         }
+      } else {
+        // Una semilla por foto: no hay conteo ni materia inerte.
+        n_total = images.length;
       }
 
-      // ===== Análisis por semilla individual + certificación INIAF 2022 =====
+      // ===== Análisis por semilla + certificación INIAF 2022 =====
       let classDistribution: AnalysisResult["classDistribution"] = [];
       let iniafIndicators: AnalysisResult["iniafIndicators"] = [];
       let certifiable = false;
       let certificationLevel = "";
       let certificationReasons: string[] = [];
       let totalAnalyzed = 0;
+      let perSeed: AnalysisResult["perSeed"] = [];
       try {
         const psForm = new FormData();
-        images.forEach(img => psForm.append("files", img.file, img.file.name));
-        // Pasar conteos del módulo de visión clásica para el indicador "Materia inerte"
+        images.forEach((img) => psForm.append("files", img.file, img.file.name));
         psForm.append("n_reject", String(n_reject));
-        psForm.append("n_total",  String(n_total));
+        psForm.append("n_total", String(n_total));
+        psForm.append("mode", sampleMode); // <-- modo una/varias semillas
         const psr = await fetch(`${base}/api/analyze_per_seed`, { method: "POST", body: psForm });
         if (psr.ok) {
           const psd = await psr.json();
@@ -177,9 +165,28 @@ const ImageAnalysis = ({
           certificationLevel   = psd.certification_level   ?? "";
           certificationReasons = psd.certification_reasons ?? [];
           totalAnalyzed        = psd.total_seeds            ?? 0;
+          perSeed              = psd.per_seed              ?? [];
         }
       } catch (e) {
         console.error("Análisis por semilla INIAF:", e);
+      }
+
+      // ===== Persistir resumen INIAF para que el PDF lo incluya =====
+      try {
+        await fetch(`${base}/api/save_iniaf/${data.analysis_id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            certifiable,
+            certification_level: certificationLevel,
+            certification_reasons: certificationReasons,
+            total_analyzed: totalAnalyzed,
+            indicators: iniafIndicators,
+            distribution: classDistribution,
+          }),
+        });
+      } catch (e) {
+        console.error("No se pudo guardar INIAF para el PDF:", e);
       }
 
       const saveReport = async () => {
@@ -204,54 +211,23 @@ const ImageAnalysis = ({
       await saveReport();
 
       setGlobalProgress(90);
-      setImages((prev) =>
-        prev.map((img) => ({ ...img, status: "completed", progress: 100 }))
-      );
+      setImages((prev) => prev.map((img) => ({ ...img, status: "completed", progress: 100 })));
 
       localStorage.setItem("latest_analysis_id", data.analysis_id);
       localStorage.setItem("latest_report_id", data.report_id);
-
       setGlobalProgress(100);
-
-      const rawFeatures = data.features
-        ? (Object.values(data.features)[0] as any)
-        : {};
-      const mappedFeatures: any = {
-        "Color medio (H)": rawFeatures["Color medio (H)"] || "N/A",
-        "Variación de color": rawFeatures["Variacion de color"] || "N/A",
-        "Tamaño relativo": rawFeatures["Tamano relativo"] || "N/A",
-        "Circularidad": rawFeatures["Circularidad"] || "N/A",
-        "Daños mecánicos": rawFeatures["Danos mecanicos"] || "N/A",
-        "Impurezas": rawFeatures["Impurezas"] || "N/A",
-        "Pureza física (%)":
-          n_total > 0
-            ? parseFloat(((n_soy / n_total) * 100).toFixed(1))
-            : (rawFeatures["MorphologicalState"] === "Good" ? 98 : 85),
-        "Materia inerte (%)":
-          n_total > 0
-            ? parseFloat(((n_reject / n_total) * 100).toFixed(1))
-            : 1,
-        "Daños mecánicos (%)": rawFeatures["Damage_ratio"]
-          ? parseFloat((rawFeatures["Damage_ratio"] * 100).toFixed(1))
-          : 0,
-        "Homogeneidad de color":
-          rawFeatures["ColorVariation_H"] < 50 ? "Uniforme" : "Variable",
-        "Forma y tamaño":
-          rawFeatures["AspectRatio"] > 0.8 ? "Dentro del rango" : "Fuera del rango",
-        "Trazabilidad digital": "Completa",
-      };
 
       const Result: AnalysisResult = {
         totalSeeds: n_total > 0 ? n_total : 1,
         viableSeeds: n_soy,
         damagedSeeds: n_reject,
-        viabilityPercentage: n_total > 0 ? parseFloat(((n_soy / n_total) * 100).toFixed(1)) : data.probability * 100,
-        qualityScore: n_total > 0 ? Math.round((n_soy / n_total) * 100) : Math.round(data.probability * 100),
+        viabilityPercentage: n_total > 0 ? parseFloat(((n_soy / n_total) * 100).toFixed(1)) : 0,
+        qualityScore: n_total > 0 ? Math.round((n_soy / n_total) * 100) : 0,
         defects: [
           { type: "Semillas de soya detectadas", count: n_soy },
           { type: "No soya / impurezas", count: n_reject },
         ],
-        features: mappedFeatures,
+        features: {},
         predictedClass: data.predicted_class,
         probability: data.probability,
         probabilityVector: data.probability_vector || [],
@@ -262,15 +238,14 @@ const ImageAnalysis = ({
         certificationLevel,
         certificationReasons,
         totalAnalyzed,
+        perSeed,
       };
 
       onComplete(Result);
     } catch (err) {
       console.error(err);
       alert("Error en el analisis");
-      setImages((prev) =>
-        prev.map((img) => ({ ...img, status: "error", progress: 0 }))
-      );
+      setImages((prev) => prev.map((img) => ({ ...img, status: "error", progress: 0 })));
     } finally {
       setIsProcessing(false);
       setIsAnalyzing(false);
@@ -279,10 +254,6 @@ const ImageAnalysis = ({
 
   const getStatusIcon = (status: UploadedImage["status"]) => {
     switch (status) {
-      case "uploading":
-        return <Loader2 className="w-5 h-5 animate-spin text-info" />;
-      case "analyzing":
-        return <Loader2 className="w-5 h-5 animate-spin text-secondary" />;
       case "completed":
         return <CheckCircle2 className="w-5 h-5 text-success" />;
       case "error":
@@ -312,9 +283,44 @@ const ImageAnalysis = ({
       <div className="space-y-2">
         <h2 className="text-2xl font-bold text-foreground">Analisis de Imagenes</h2>
         <p className="text-muted-foreground">
-          Cargue las imagenes de las semillas para su analisis mediante redes
-          neuronales
+          Cargue las imagenes de las semillas para su analisis mediante redes neuronales
         </p>
+      </div>
+
+      {/* ==== Selector de tipo de muestra ==== */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium">Tipo de muestra:</span>
+        <div className="inline-flex rounded-lg border p-1 bg-muted/30">
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={() => setSampleMode("multi")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sampleMode === "multi"
+                ? "bg-primary text-primary-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Varias semillas
+          </button>
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={() => setSampleMode("single")}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              sampleMode === "single"
+                ? "bg-primary text-primary-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Una semilla (close-up)
+          </button>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {sampleMode === "multi"
+            ? "Cada foto tiene varias semillas (se detecta y cuenta cada una)."
+            : "Cada foto es una sola semilla (se clasifica completa, sin dividir)."}
+        </span>
       </div>
 
       {/* Zona de carga */}
@@ -327,7 +333,7 @@ const ImageAnalysis = ({
           Arrastra imagenes aqui o haz clic para seleccionar
         </p>
         <p className="text-sm text-muted-foreground">
-          Soporta JPG, JPEG, PNG, BPM. Maximo recomendado 10 imagenes
+          Soporta JPG, JPEG, PNG, BMP. Maximo recomendado 10 imagenes
         </p>
         <input
           ref={fileInputRef}
@@ -340,7 +346,7 @@ const ImageAnalysis = ({
         />
       </div>
 
-      {/* ==== Camara en vivo: abrir y capturar ==== */}
+      {/* ==== Camara en vivo ==== */}
       <div className="border border-border rounded-lg p-4">
         {!cameraOpen ? (
           <Button
@@ -360,23 +366,14 @@ const ImageAnalysis = ({
               agrega a la lista para analizarse.
             </p>
             <div className="rounded-lg overflow-hidden border bg-black">
-              <img
-                src={`${base}/api/camera/stream?camera=0`}
-                alt="Camara en vivo"
-                className="w-full"
-              />
+              <img src={`${base}/api/camera/stream?camera=1`} alt="Camara en vivo" className="w-full" />
             </div>
             <div className="flex gap-3">
               <Button type="button" onClick={capturePhoto} className="gap-2">
                 <Camera className="w-4 h-4" />
                 Tomar foto
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setCameraOpen(false)}
-                className="gap-2"
-              >
+              <Button type="button" variant="outline" onClick={() => setCameraOpen(false)} className="gap-2">
                 <X className="w-4 h-4" />
                 Cerrar camara
               </Button>
@@ -389,17 +386,10 @@ const ImageAnalysis = ({
       {isProcessing && (
         <div className="flex flex-col items-center justify-center py-6">
           <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
-          <p className="text-primary font-medium mb-2">
-            Analizando semillas con IA...
-          </p>
-          <Progress
-            value={globalProgress}
-            className="w-full md:w-2/3 h-3 rounded-full"
-          />
+          <p className="text-primary font-medium mb-2">Analizando semillas con IA...</p>
+          <Progress value={globalProgress} className="w-full md:w-2/3 h-3 rounded-full" />
           <p className="text-sm text-muted-foreground mt-2">
-            {globalProgress < 100
-              ? `Progreso: ${globalProgress.toFixed(0)}%`
-              : "Analisis completado"}
+            {globalProgress < 100 ? `Progreso: ${globalProgress.toFixed(0)}%` : "Analisis completado"}
           </p>
         </div>
       )}
@@ -407,41 +397,25 @@ const ImageAnalysis = ({
       {/* Lista de imagenes */}
       {images.length > 0 && (
         <div className="space-y-4">
-          <h3 className="font-semibold text-lg">
-            Imagenes cargadas ({images.length})
-          </h3>
+          <h3 className="font-semibold text-lg">Imagenes cargadas ({images.length})</h3>
           <div className="grid gap-4">
             {images.map((image, index) => (
-              <div
-                key={index}
-                className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border border-border"
-              >
-                <img
-                  src={image.preview}
-                  alt={`Preview ${index + 1}`}
-                  className="w-20 h-20 object-cover rounded"
-                />
+              <div key={index} className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg border border-border">
+                <img src={image.preview} alt={`Preview ${index + 1}`} className="w-20 h-20 object-cover rounded" />
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-medium truncate">{image.file.name}</p>
                     {!isProcessing && image.status === "pending" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeImage(index)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => removeImage(index)}>
                         <X className="w-4 h-4" />
                       </Button>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusIcon(image.status)}
-                    <span className="text-sm text-muted-foreground">
-                      {getStatusText(image.status)}
-                    </span>
+                    <span className="text-sm text-muted-foreground">{getStatusText(image.status)}</span>
                   </div>
-                  {(image.status === "uploading" ||
-                    image.status === "analyzing") && (
+                  {(image.status === "uploading" || image.status === "analyzing") && (
                     <Progress value={image.progress} className="h-2" />
                   )}
                 </div>
@@ -453,13 +427,7 @@ const ImageAnalysis = ({
 
       {/* Botones */}
       <div className="flex justify-between pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onBack}
-          disabled={isProcessing}
-          className="gap-2"
-        >
+        <Button type="button" variant="outline" onClick={onBack} disabled={isProcessing} className="gap-2">
           <ArrowLeft className="w-4 h-4" />
           Volver
         </Button>
