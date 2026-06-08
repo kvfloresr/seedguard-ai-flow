@@ -48,6 +48,25 @@ export interface AnalysisResult {
   predictedClass: string;   
   probability: number;     
   probabilityVector?: number[];
+  overlayImages?: string[];
+  classDistribution?: {
+    class: string;
+    label_es: string;
+    count: number;
+    percentage: number;
+    color: string;
+  }[];
+  iniafIndicators?: {
+    name: string;
+    value: string | number;
+    threshold: string;
+    pass: boolean;
+    icon: string;
+  }[];
+  certifiable?: boolean;
+  certificationLevel?: string;
+  certificationReasons?: string[];
+  totalAnalyzed?: number;
 }
 
 const steps = [

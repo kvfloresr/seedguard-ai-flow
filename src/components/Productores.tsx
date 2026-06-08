@@ -7,7 +7,9 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Users, UserPlus, Search, ArrowLeft, LogOut } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Users, UserPlus, Search, Edit, Trash2, ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 interface Producer {
@@ -26,6 +28,8 @@ const Producers = ({ onBackToDashboard }: ProducersProps) => {
 const [producers, setProducers] = useState<Producer[]>([]);
 const [formData, setFormData] = useState({ name: "", cod_producer: "", phone: "", address: "" });
 const [search, setSearch] = useState("");
+const [editingProducer, setEditingProducer] = useState<Producer | null>(null);
+const [editForm, setEditForm] = useState({ name: "", cod_producer: "", phone: "", address: "" });
 
 const userRaw = localStorage.getItem("user");
 const user = userRaw ? JSON.parse(userRaw) : null;
@@ -64,6 +68,46 @@ try {
     }
 } catch (error) {
     toast({ title: "Error", description: "No se pudo registrar el productor.", variant: "destructive" });
+}
+};
+
+const handleEdit = async () => {
+if (!editingProducer) return;
+try {
+    const res = await fetch(`${base}/api/producers`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+    body: JSON.stringify({ producer_id: editingProducer.producer_id, ...editForm }),
+    });
+    if (res.ok) {
+    setEditingProducer(null);
+    await fetchProducers();
+    toast({ title: "Éxito", description: "Productor actualizado correctamente." });
+    } else {
+    const error = await res.json();
+    toast({ title: "Error", description: error.error, variant: "destructive" });
+    }
+} catch (error) {
+    toast({ title: "Error", description: "No se pudo actualizar el productor.", variant: "destructive" });
+}
+};
+
+const handleDelete = async (producer_id: string) => {
+try {
+    const res = await fetch(`${base}/api/producers`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("token")}` },
+    body: JSON.stringify({ producer_id }),
+    });
+    if (res.ok) {
+    await fetchProducers();
+    toast({ title: "Éxito", description: "Productor eliminado correctamente." });
+    } else {
+    const error = await res.json();
+    toast({ title: "Error", description: error.error, variant: "destructive" });
+    }
+} catch (error) {
+    toast({ title: "Error", description: "No se pudo eliminar el productor.", variant: "destructive" });
 }
 };
 
@@ -142,6 +186,7 @@ return (
                     <TableHead className="font-semibold">Código</TableHead>
                     <TableHead className="font-semibold">Teléfono</TableHead>
                     <TableHead className="font-semibold">Dirección</TableHead>
+                    <TableHead className="font-semibold">Acciones</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -151,6 +196,48 @@ return (
                     <TableCell>{p.cod_producer}</TableCell>
                     <TableCell>{p.phone}</TableCell>
                     <TableCell>{p.address}</TableCell>
+                    <TableCell>
+                        <div className="flex gap-2">
+                        <Dialog>
+                            <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={() => {
+                                setEditingProducer(p);
+                                setEditForm({ name: p.name, cod_producer: p.cod_producer, phone: p.phone, address: p.address });
+                            }}>
+                                <Edit className="w-4 h-4 mr-2" /> Editar
+                            </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                            <DialogHeader><DialogTitle>Editar Productor</DialogTitle></DialogHeader>
+                            <div className="space-y-4">
+                                <div><Label>Nombre</Label><Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
+                                <div><Label>Código de Productor</Label><Input value={editForm.cod_producer} onChange={(e) => setEditForm({ ...editForm, cod_producer: e.target.value })} /></div>
+                                <div><Label>Teléfono</Label><Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} /></div>
+                                <div><Label>Dirección</Label><Input value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} /></div>
+                                <Button onClick={handleEdit} className="w-full">Guardar Cambios</Button>
+                            </div>
+                            </DialogContent>
+                        </Dialog>
+
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-800">
+                                <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                            </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>¿Eliminar Productor?</AlertDialogTitle>
+                                <AlertDialogDescription>Esta acción no se puede deshacer. ¿Seguro que querés eliminar este productor?</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(p.producer_id)} className="bg-red-600 hover:bg-red-700">Eliminar</AlertDialogAction>
+                            </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        </div>
+                    </TableCell>
                     </TableRow>
                 ))}
                 </TableBody>

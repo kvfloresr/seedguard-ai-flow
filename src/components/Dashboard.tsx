@@ -11,6 +11,7 @@ import Lotes from "./Lotes";
 import Muestras from "./Muestras";
 import AdminPanel from "./AdminPanel";
 import ModelEvaluation from "./ModelEvaluation";
+import Producers from "./Productores";
 
 interface Report {
 _id: string;
@@ -114,6 +115,9 @@ if (currentView === 'admin') {
 if (currentView === 'model-evaluation') {
     return <ModelEvaluation onBackToDashboard={() => setCurrentView('dashboard')} />;
 }
+if (currentView === 'producers') {
+    return <Producers onBackToDashboard={() => setCurrentView('dashboard')} />;
+}
 
 
 return (
@@ -202,7 +206,21 @@ return (
             </CardContent>
         </Card>
 
-        
+        <Card className="bg-gradient-card hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+        <CardContent className="text-center p-8">
+            <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
+            <User className="w-8 h-8 text-teal-600" />
+            </div>
+            <h4 className="text-xl font-semibold mb-2">Productores</h4>
+            <p className="text-muted-foreground mb-4">Registra y gestiona los productores de semillas.</p>
+            <Button
+            onClick={() => setCurrentView('producers')}
+            className="bg-gradient-to-r from-teal-500 to-teal-700 hover:from-teal-600 hover:to-teal-800 text-white shadow-md"
+            >
+            Ver Productores
+            </Button>
+        </CardContent>
+        </Card>
 
         <Card className="bg-gradient-card hover:shadow-xl transition-all duration-300 transform hover:scale-105">
             <CardContent className="text-center p-8">

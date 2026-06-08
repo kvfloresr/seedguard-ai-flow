@@ -1,14 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Download, RefreshCw, Calendar, User, Package, FlaskConical } from "lucide-react";
+import {
+  FileText, RefreshCw, User, Package, FlaskConical,
+  ShieldCheck, ShieldAlert, CheckCircle2, XCircle,
+} from "lucide-react";
 import { AnalysisResult, ProducerData, LoteData, SampleData } from "../SeedVerificationWizard";
-import { useState, useEffect } from "react";
-
-interface OverlayImage {
-  filename: string;
-  image_base64: string;
-}
+import SeedMorphologyPanels from "./SeedMorphologyPanels";
 
 interface FinalReportProps {
   result: AnalysisResult;
@@ -25,74 +23,46 @@ const FinalReport = ({
   sampleData,
   onNewVerification,
 }: FinalReportProps) => {
-  const [overlayImages, setOverlayImages] = useState<OverlayImage[]>([]);
-  const [loadingImages, setLoadingImages] = useState(false);
-
   const currentDate = new Date().toLocaleDateString("es-ES", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-  useEffect(() => {
-    const loadOverlayImages = async () => {
-      const analysis_id = localStorage.getItem("latest_analysis_id");
-      if (!analysis_id) return;
-      
-      setLoadingImages(true);
-      try {
-        const base = import.meta.env.VITE_API_URL;
-        const res = await fetch(`${base}/api/get_overlay_images/${analysis_id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setOverlayImages(data.images || []);
-        }
-      } catch (error) {
-        console.error("Error cargando imágenes overlay:", error);
-      } finally {
-        setLoadingImages(false);
-      }
-    };
-    loadOverlayImages();
-  }, []);
+  // Datos INIAF (única fuente de verdad, consistente con la pantalla de Resultados)
+  const certifiable = !!result.certifiable;
+  const indicators = result.iniafIndicators ?? [];
+  const distribution = result.classDistribution ?? [];
+  const reasons = result.certificationReasons ?? [];
+  const totalAnalyzed =
+    result.totalAnalyzed ?? distribution.reduce((s, d) => s + d.count, 0);
 
   const handleDownloadPDF = async () => {
-  const analysis_id = localStorage.getItem("latest_analysis_id");
-
-  if (!analysis_id) {
-    alert("No existe informe disponible");
-    return;
-  }
-
-  try {
-    const base = import.meta.env.VITE_API_URL;
-    const res = await fetch(`${base}/api/download_report/${analysis_id}`);
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      throw new Error(err?.error || "Error descargando PDF");
+    const analysis_id = localStorage.getItem("latest_analysis_id");
+    if (!analysis_id) {
+      alert("No existe informe disponible");
+      return;
     }
-
-    const blob = await res.blob();
-    const blobUrl = window.URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = `Reporte_${analysis_id}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
-  } catch (error) {
-    console.error(error);
-    alert("Error al descargar PDF");
-  }
-};
-
-
-  const handleDownloadExcel = () => {
-    alert("Funcionalidad de descarga Excel en desarrollo");
+    try {
+      const base = import.meta.env.VITE_API_URL;
+      const res = await fetch(`${base}/api/download_report/${analysis_id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error descargando PDF");
+      }
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `Reporte_${analysis_id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    } catch (error) {
+      console.error(error);
+      alert("Error al descargar PDF");
+    }
   };
 
   return (
@@ -108,9 +78,7 @@ const FinalReport = ({
         <p className="text-muted-foreground">
           Reporte completo del análisis de calidad de semillas
         </p>
-        <p className="text-sm text-muted-foreground">
-          Generado el {currentDate}
-        </p>
+        <p className="text-sm text-muted-foreground">Generado el {currentDate}</p>
       </div>
 
       <Separator />
@@ -141,7 +109,7 @@ const FinalReport = ({
         </div>
       </Card>
 
-      {/* Lote Information */}
+      {/* Lote */}
       <Card className="p-6 bg-gradient-card">
         <div className="flex items-center gap-2 mb-4">
           <Package className="w-5 h-5 text-primary" />
@@ -161,7 +129,7 @@ const FinalReport = ({
         </div>
       </Card>
 
-      {/* Sample Information */}
+      {/* Muestra */}
       <Card className="p-6 bg-gradient-card">
         <div className="flex items-center gap-2 mb-4">
           <FlaskConical className="w-5 h-5 text-primary" />
@@ -183,64 +151,147 @@ const FinalReport = ({
         </div>
       </Card>
 
+      <Separator />
 
-
-      {/* Quality Assessment */}
-      <Card className="p-6 bg-gradient-card">
-        <h3 className="text-lg font-semibold mb-4">Evaluación de Calidad</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Puntuación de Calidad</span>
-            <span className="text-2xl font-bold text-primary">
-              {result.qualityScore.toFixed(2)}/100
-            </span>
+      {/* ===== Veredicto de certificación INIAF (reemplaza Evaluación de Calidad) ===== */}
+      <Card
+        className="overflow-hidden border-2"
+        style={{ borderColor: certifiable ? "#22c55e" : "#ef4444" }}
+      >
+        <div
+          className={`p-6 md:p-8 ${
+            certifiable
+              ? "bg-gradient-to-br from-green-50 to-emerald-50"
+              : "bg-gradient-to-br from-red-50 to-rose-50"
+          }`}
+        >
+          <div className="flex items-center gap-5">
+            <div
+              className={`w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                certifiable ? "bg-green-100" : "bg-red-100"
+              }`}
+            >
+              {certifiable ? (
+                <ShieldCheck className="w-11 h-11 text-green-600" />
+              ) : (
+                <ShieldAlert className="w-11 h-11 text-red-600" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+                Certificación INIAF 2022 · {totalAnalyzed} semillas analizadas
+              </p>
+              <h3
+                className={`text-2xl md:text-3xl font-bold leading-tight ${
+                  certifiable ? "text-green-700" : "text-red-700"
+                }`}
+              >
+                {result.certificationLevel ??
+                  (certifiable
+                    ? "Apto para certificación INIAF"
+                    : "No certificable — No cumple norma INIAF 2022")}
+              </h3>
+              {!certifiable && reasons.length > 0 && (
+                <p className="text-sm text-red-700/80 mt-2">
+                  No cumple en: {reasons.join("  ·  ")}
+                </p>
+              )}
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {result.qualityScore >= 90 && "Excelente: El lote cumple con los más altos estándares de calidad."}
-            {result.qualityScore >= 75 && result.qualityScore < 90 && "Buena: Presenta una calidad aceptable para comercialización."}
-            {result.qualityScore >= 60 && result.qualityScore < 75 && "Aceptable: Puede ser comercializado con ciertas restricciones."}
-            {result.qualityScore < 60 && "Deficiente: Se recomienda no comercializar este lote sin tratamiento previo."}
-          </p>
         </div>
       </Card>
 
-      <Separator />
-
-      {/* Nueva Sección: Imágenes con Máscaras Aplicadas */}
-      <Card className="p-6 bg-gradient-card">
-        <h3 className="text-lg font-semibold mb-4">Imágenes Procesadas con Máscaras Aplicadas</h3>
-        {loadingImages ? (
-          <p>Cargando imágenes...</p>
-        ) : overlayImages.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {overlayImages.map((img, index) => (
-              <div key={index} className="text-center">
-                <img src={img.image_base64} alt={img.filename} className="w-full h-auto rounded-lg" />
-                <p className="text-sm text-muted-foreground mt-2">{img.filename}</p>
+      {/* Indicadores INIAF */}
+      {indicators.length > 0 && (
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+            Indicadores de calidad física · Tabla 3.1 INIAF
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {indicators.map((ind, i) => (
+              <div
+                key={i}
+                className={`relative rounded-xl border p-4 pl-5 ${
+                  ind.pass ? "border-green-200 bg-green-50/40" : "border-red-200 bg-red-50/50"
+                }`}
+              >
+                <span
+                  className={`absolute left-0 top-4 bottom-4 w-1.5 rounded-full ${
+                    ind.pass ? "bg-green-500" : "bg-red-500"
+                  }`}
+                />
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium text-foreground">{ind.name}</p>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${
+                      ind.pass ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {ind.pass ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                    {ind.pass ? "Cumple" : "No cumple"}
+                  </span>
+                </div>
+                <p className={`mt-2 text-2xl font-bold ${ind.pass ? "text-green-700" : "text-red-700"}`}>
+                  {typeof ind.value === "number" ? `${ind.value}%` : ind.value}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Norma INIAF: {ind.threshold}</p>
               </div>
             ))}
           </div>
-        ) : (
-          <p>No hay imágenes disponibles.</p>
-        )}
-        <p className="text-sm text-muted-foreground mt-4">
-          Verde: Contorno de la semilla<br/>
-          Rojo: Manchas y daños mecánicos<br/>
-          Azul: Impurezas externas
-        </p>
-      </Card>
+          <p className="text-xs text-muted-foreground mt-4">
+            Fuente: Compendio de Normas Nacionales sobre Semillas de Especies Agrícolas, INIAF 2022.
+          </p>
+        </Card>
+      )}
+
+      {/* Distribución por categoría */}
+      {distribution.length > 0 && (
+        <Card className="p-6 bg-gradient-card">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
+            Distribución por categoría de calidad (CNN)
+          </h3>
+          <div className="space-y-4">
+            {distribution.map((item) => (
+              <div key={item.class}>
+                <div className="flex items-center justify-between text-sm mb-1.5">
+                  <span className="flex items-center gap-2 font-medium">
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: item.color ?? "#888" }}
+                    />
+                    {item.label_es ?? item.class}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {item.count} sem ·{" "}
+                    <strong className="text-foreground">{item.percentage.toFixed(1)}%</strong>
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${item.percentage}%`, backgroundColor: item.color ?? "#888" }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <Separator />
+
+      {/* ===== Detección + análisis morfológico por semilla ===== */}
+      <SeedMorphologyPanels result={result} />
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex gap-2">
           <Button
-            onClick={handleDownloadPDF}  
+            onClick={handleDownloadPDF}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             Descargar Informe PDF
           </Button>
-
-          
         </div>
         <Button
           onClick={onNewVerification}
