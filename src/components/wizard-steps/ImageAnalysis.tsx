@@ -183,6 +183,7 @@ const ImageAnalysis = ({
             total_analyzed: totalAnalyzed,
             indicators: iniafIndicators,
             distribution: classDistribution,
+            per_seed: perSeed,
           }),
         });
       } catch (e) {
