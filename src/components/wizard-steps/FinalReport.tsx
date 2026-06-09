@@ -179,7 +179,7 @@ const FinalReport = ({
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
-                Certificación INIAF 2022 · {totalAnalyzed} semillas analizadas
+                Certificación INIAF· {totalAnalyzed} semillas analizadas
               </p>
               <h3
                 className={`text-2xl md:text-3xl font-bold leading-tight ${
@@ -189,7 +189,7 @@ const FinalReport = ({
                 {result.certificationLevel ??
                   (certifiable
                     ? "Apto para certificación INIAF"
-                    : "No certificable — No cumple norma INIAF 2022")}
+                    : "No certificable — No cumple norma INIAF")}
               </h3>
               {!certifiable && reasons.length > 0 && (
                 <p className="text-sm text-red-700/80 mt-2">
@@ -205,7 +205,7 @@ const FinalReport = ({
       {indicators.length > 0 && (
         <Card className="p-6 bg-gradient-card">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
-            Indicadores de calidad física · Tabla 3.1 INIAF
+            Indicadores de calidad física
           </h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {indicators.map((ind, i) => (
@@ -238,9 +238,6 @@ const FinalReport = ({
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            Fuente: Compendio de Normas Nacionales sobre Semillas de Especies Agrícolas, INIAF 2022.
-          </p>
         </Card>
       )}
 

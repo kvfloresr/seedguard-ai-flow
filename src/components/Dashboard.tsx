@@ -11,6 +11,7 @@ import Lotes from "./Lotes";
 import Muestras from "./Muestras";
 import AdminPanel from "./AdminPanel";
 import ModelEvaluation from "./ModelEvaluation";
+import AnalysisHistory from "./AnalysisHistory";
 import Producers from "./Productores";
 
 interface Report {
@@ -39,7 +40,7 @@ onBackToWizard: () => void;
 }
 
 const Dashboard = ({ name, role_name, reports: initialReports, onBackToWizard }: DashboardProps) => {
-const [currentView, setCurrentView] = useState<'dashboard' | 'lotes' | 'muestras' | 'admin' | 'model-evaluation' | 'producers'>('dashboard');
+const [currentView, setCurrentView] = useState<'dashboard' | 'lotes' | 'muestras' | 'admin' | 'model-evaluation' | 'producers' | 'analyses'>('dashboard');
 const [allReports, setAllReports] = useState<Report[]>([]);
 const [displayedReports, setDisplayedReports] = useState<Report[]>([]);
 const [showAll, setShowAll] = useState(false);
@@ -117,6 +118,9 @@ if (currentView === 'model-evaluation') {
 }
 if (currentView === 'producers') {
     return <Producers onBackToDashboard={() => setCurrentView('dashboard')} />;
+}
+if (currentView === 'analyses') {
+    return <AnalysisHistory onBackToDashboard={() => setCurrentView('dashboard')} />;
 }
 
 
@@ -280,6 +284,9 @@ return (
         <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-green-600">Historial de Análisis IA</h2>
         <p className="text-muted-foreground">Reportes generados por el sistema de verificación</p>
+        <Button onClick={() => setCurrentView('analyses')} className="mt-4 bg-green-600 hover:bg-green-700 text-white">
+            <Activity className="w-4 h-4 mr-2" /> Ver todos los análisis
+        </Button>
         </div>
 
         <Card className="bg-gradient-card shadow-lg">

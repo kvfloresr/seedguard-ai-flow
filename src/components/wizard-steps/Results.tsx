@@ -9,7 +9,6 @@ interface ResultsProps {
 }
 
 const Results = ({ result, onNext }: ResultsProps) => {
-  // Una sola fuente de verdad: el análisis por semilla (INIAF).
   const certifiable = !!result.certifiable;
   const indicators = result.iniafIndicators ?? [];
   const distribution = result.classDistribution ?? [];
@@ -19,7 +18,6 @@ const Results = ({ result, onNext }: ResultsProps) => {
 
   const hasData = indicators.length > 0 || distribution.length > 0;
 
-  // Sin semillas detectadas: estado vacío claro en vez de datos vacíos.
   if (!hasData) {
     return (
       <div className="space-y-6">
@@ -69,7 +67,7 @@ const Results = ({ result, onNext }: ResultsProps) => {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
-                Certificación INIAF 2022 · {totalAnalyzed} semillas analizadas
+                Certificación INIAF · {totalAnalyzed} semillas analizadas
               </p>
               <h2
                 className={`text-2xl md:text-3xl font-bold leading-tight ${
@@ -79,7 +77,7 @@ const Results = ({ result, onNext }: ResultsProps) => {
                 {result.certificationLevel ??
                   (certifiable
                     ? "Apto para certificación INIAF"
-                    : "No certificable — No cumple norma INIAF 2022")}
+                    : "No certificable — No cumple norma INIAF")}
               </h2>
               {!certifiable && reasons.length > 0 && (
                 <p className="text-sm text-red-700/80 mt-2">
@@ -145,10 +143,6 @@ const Results = ({ result, onNext }: ResultsProps) => {
             ))}
           </div>
 
-          <p className="text-xs text-muted-foreground mt-4">
-            Fuente: Compendio de Normas Nacionales sobre Semillas de Especies
-            Agrícolas, INIAF 2022.
-          </p>
         </Card>
       )}
 
